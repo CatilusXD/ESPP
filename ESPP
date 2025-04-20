@@ -1,0 +1,149 @@
+-- LocalScript (Executor or StarterPlayerScripts if in Studio)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- Configurable Colors
+local boxColor = Color3.fromRGB(0, 0, 255)       -- Box and tracer color (Blue)
+local highlightColor = Color3.fromRGB(0, 0, 255) -- Glow highlight (Blue)
+
+-- Tables
+local ESPBoxes = {}
+local Tracers = {}
+
+-- Create a 2D box (Drawing API)
+local function createBox()
+	local box = Drawing.new("Square")
+	box.Color = boxColor
+	box.Thickness = 2
+	box.Filled = false
+	box.Transparency = 1
+	box.Visible = false
+	return box
+end
+
+-- Create a tracer line (Drawing API)
+local function createTracer()
+	local line = Drawing.new("Line")
+	line.Color = boxColor
+	line.Thickness = 1.5
+	line.Transparency = 1
+	line.Visible = false
+	return line
+end
+
+-- Create a glow ESP using Roblox's Highlight
+local function createHighlight(character)
+	if character:FindFirstChild("ESP_Highlight") then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "ESP_Highlight"
+	highlight.FillColor = highlightColor
+	highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+	highlight.FillTransparency = 0.5
+	highlight.OutlineTransparency = 0
+	highlight.Adornee = character
+	highlight.Parent = character
+end
+
+-- Add highlights and drawings for all players
+local function applyESPToAll()
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character then
+			createHighlight(player.Character)
+
+			if not ESPBoxes[player] then
+				ESPBoxes[player] = createBox()
+			end
+
+			if not Tracers[player] then
+				Tracers[player] = createTracer()
+			end
+		end
+	end
+end
+
+-- Real-time updates (RenderStepped loop)
+RunService.RenderStepped:Connect(function()
+	local localChar = LocalPlayer.Character
+	local localHRP = localChar and localChar:FindFirstChild("HumanoidRootPart")
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			local character = player.Character
+			local hrp = character and character:FindFirstChild("HumanoidRootPart")
+
+			-- Update highlight
+			if character and not character:FindFirstChild("ESP_Highlight") then
+				createHighlight(character)
+			end
+
+			-- Update box
+			local box = ESPBoxes[player] or createBox()
+			ESPBoxes[player] = box
+
+			-- Update tracer
+			local tracer = Tracers[player] or createTracer()
+			Tracers[player] = tracer
+
+			if hrp then
+				local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+				if onScreen then
+					local size = Vector2.new(50, 75)
+					box.Size = size
+					box.Position = Vector2.new(screenPos.X - size.X / 2, screenPos.Y - size.Y / 2)
+					box.Visible = true
+
+					if localHRP then
+						local fromScreen = Camera:WorldToViewportPoint(localHRP.Position)
+						tracer.From = Vector2.new(fromScreen.X, fromScreen.Y)
+						tracer.To = Vector2.new(screenPos.X, screenPos.Y)
+						tracer.Visible = true
+					else
+						tracer.Visible = false
+					end
+				else
+					box.Visible = false
+					tracer.Visible = false
+				end
+			else
+				box.Visible = false
+				tracer.Visible = false
+			end
+		end
+	end
+end)
+
+-- Remove drawings when player leaves
+Players.PlayerRemoving:Connect(function(player)
+	if ESPBoxes[player] then
+		ESPBoxes[player]:Remove()
+		ESPBoxes[player] = nil
+	end
+	if Tracers[player] then
+		Tracers[player]:Remove()
+		Tracers[player] = nil
+	end
+end)
+
+-- Character respawn + player joining
+local function onPlayerAdded(player)
+	if player ~= LocalPlayer then
+		player.CharacterAdded:Connect(function(char)
+			task.wait(1)
+			createHighlight(char)
+		end)
+
+		if player.Character then
+			createHighlight(player.Character)
+		end
+	end
+end
+
+-- Run initial
+applyESPToAll()
+for _, player in ipairs(Players:GetPlayers()) do
+	onPlayerAdded(player)
+end
+Players.PlayerAdded:Connect(onPlayerAdded)
