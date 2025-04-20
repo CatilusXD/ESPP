@@ -4,18 +4,13 @@ local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Configurable Colors
-local boxColor = Color3.fromRGB(0, 0, 255)       -- Box and tracer color (Blue)
-local highlightColor = Color3.fromRGB(0, 0, 255) -- Glow highlight (Blue)
-
 -- Tables
 local ESPBoxes = {}
 local Tracers = {}
 
--- Create a 2D box (Drawing API)
+-- Function to create a 2D box (Drawing API)
 local function createBox()
 	local box = Drawing.new("Square")
-	box.Color = boxColor
 	box.Thickness = 2
 	box.Filled = false
 	box.Transparency = 1
@@ -23,28 +18,32 @@ local function createBox()
 	return box
 end
 
--- Create a tracer line (Drawing API)
+-- Function to create a tracer line (Drawing API)
 local function createTracer()
 	local line = Drawing.new("Line")
-	line.Color = boxColor
 	line.Thickness = 1.5
 	line.Transparency = 1
 	line.Visible = false
 	return line
 end
 
--- Create a glow ESP using Roblox's Highlight
+-- Function to create a glow ESP using Roblox's Highlight
 local function createHighlight(character)
 	if character:FindFirstChild("ESP_Highlight") then return end
 
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "ESP_Highlight"
-	highlight.FillColor = highlightColor
-	highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
 	highlight.FillTransparency = 0.5
 	highlight.OutlineTransparency = 0
 	highlight.Adornee = character
 	highlight.Parent = character
+end
+
+-- Function to generate a rainbow color
+local function getRainbowColor(time)
+	local colorValue = math.sin(time * 2) * 0.5 + 0.5
+	local color = Color3.fromHSV(colorValue, 1, 1)
+	return color
 end
 
 -- Add highlights and drawings for all players
@@ -65,9 +64,10 @@ local function applyESPToAll()
 end
 
 -- Real-time updates (RenderStepped loop)
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(deltaTime)
 	local localChar = LocalPlayer.Character
 	local localHRP = localChar and localChar:FindFirstChild("HumanoidRootPart")
+	local time = tick()  -- Get the current time to cycle colors
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		if player ~= LocalPlayer then
@@ -86,6 +86,13 @@ RunService.RenderStepped:Connect(function()
 			-- Update tracer
 			local tracer = Tracers[player] or createTracer()
 			Tracers[player] = tracer
+
+			-- Get a rainbow color based on the time
+			local rainbowColor = getRainbowColor(time)
+
+			-- Apply rainbow color to the box and tracer
+			box.Color = rainbowColor
+			tracer.Color = rainbowColor
 
 			if hrp then
 				local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
